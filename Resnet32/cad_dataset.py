@@ -19,7 +19,7 @@ from torchmetrics.functional import peak_signal_noise_ratio as psnr
 from scipy.stats import shapiro, kstest, normaltest
 import matplotlib.pyplot as plt
 
-imgdir='/home/chence/Desktop/workspace/Cmp_and_Drop/Cmp4Train_exp/pytorch_resnet_cifar10/visualize_info/'
+imgdir='workspace/Cmp_and_Drop/Cmp4Train_exp/pytorch_resnet_cifar10/visualize_info/'
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -61,13 +61,13 @@ class CmpBatchDataset(Dataset):
         return len(self.images_tensor)
 
     def __getitem__(self, idx):
-        # with torch.random.fork_rng():  # 保存和恢复随机状态
+        # with torch.random.fork_rng():  
         #     current_time_seed = int(time.time())
         #     torch.manual_seed(current_time_seed)
         # batch_idx, sample_idx = divmod(idx, 64)
         decompressed_batch = zfpy.decompress_numpy(self.images_tensor[idx])
         ideal_size = round(50000/len(self.images_tensor))
-        image = torch.tensor(decompressed_batch)  # 转换为 PyTorch 张量
+        image = torch.tensor(decompressed_batch)  
         label = self.labels_tensor[idx]#[batch_idx][sample_idx]
         if image.shape[0] != ideal_size:
             image = self.pad_tensor(image,ideal_size)
@@ -83,14 +83,14 @@ class CmpBatchDataset(Dataset):
         return image, label
     
     def pad_tensor(self, tensor, target_size):
-        """将 Tensor 复制补齐到指定大小"""
+        
         current_size = tensor.shape[0]
         if current_size < target_size:
-            # 计算需要复制的次数
+            
             num_repeats = target_size // current_size
             remainder = target_size % current_size
 
-            # 复制 Tensor 并拼接
+            
             tensor = torch.cat([tensor] * num_repeats + [tensor[:remainder]], dim=0)
         
         return tensor
@@ -121,41 +121,24 @@ class valDataset(Dataset):
 class CubicCosineAnnealingLR(torch.optim.lr_scheduler._LRScheduler):
 
     def __init__(self, optimizer, T_max, eta_min=0, last_epoch=-1, gamma=3.0):
-        """
-        自定义的Cubic + CosineAnnealing学习率调度器.
         
-        参数：
-        optimizer: torch.optim.Optimizer
-            优化器实例。
-        T_max: int
-            学习率的最大周期，即从最高学习率衰减到最低学习率的总步数。
-        eta_min: float (default: 0)
-            最小学习率，学习率衰减到此值后不再降低。
-        last_epoch: int (default: -1)
-            当前的epoch数目，-1表示从头开始。
-        gamma: float (default: 3.0)
-            用于立方缩放的因子，默认值为3表示立方缩放。
-        """
         self.T_max = T_max
         self.eta_min = eta_min
-        self.gamma = gamma  # 控制立方缩放强度
+        self.gamma = gamma  
         super(CubicCosineAnnealingLR, self).__init__(optimizer, last_epoch)
 
     def get_lr(self):
-        """
-        获取每个epoch/batch的学习率，结合立方缩放和余弦调度。
-        """
-        # 当前的epoch/step数
+       
+       
         T_cur = self.last_epoch
-        # 余弦学习率调度公式
-        cos_inner = np.pi * (T_cur / self.T_max)  # pi * 当前epoch / 最大epoch
-        cos_out = np.cos(cos_inner)  # 计算cos( pi * T_cur / T_max )
-        
-        # 获取基础学习率 (根据当前的cos值进行调整)
+     
+        cos_inner = np.pi * (T_cur / self.T_max) 
+        cos_out = np.cos(cos_inner)  
+
         base_lrs = [self.eta_min + (base_lr - self.eta_min) * (1 + cos_out) / 2
                     for base_lr in self.base_lrs]
         
-        # 进行立方缩放调整的学习率
+      
         cubic_scaled_lrs = [lr * (1-T_cur / self.T_max) ** self.gamma for lr in base_lrs]
         
         return cubic_scaled_lrs
@@ -163,46 +146,35 @@ class CubicCosineAnnealingLR(torch.optim.lr_scheduler._LRScheduler):
 
 class LayerWiseCosineScheduler:
     def __init__(self, model, optimizer,args, base_lr=0.1, lr_decay=0.9, t_max=100, eta_min_factor=0.1):
-        """
-        初始化逐层学习率调度器。
-
-        参数：
-        - model: nn.Module，待训练的模型。
-        - optimizer: torch.optim.Optimizer，优化器。
-        - base_lr: float，每层初始学习率的起始值。
-        - lr_decay: float，每层学习率递减因子。
-        - t_max: int，余弦调度器的最大周期数。
-        - eta_min_factor: float，最低学习率是初始学习率的比例。
-        """
         self.optimizer = optimizer
         self.schedulers = []
         self._init_schedulers(model, base_lr, lr_decay, t_max, eta_min_factor, args)
 
     def _init_schedulers(self, model, base_lr, lr_decay, t_max, eta_min_factor,args):
-        """初始化每一层的调度器。"""
+      
         layerwise_params = []
         current_lr = base_lr
         for name, param in model.named_parameters():
             if param.requires_grad:
                 layerwise_params.append({"params": param, "lr": current_lr})
-                current_lr *= lr_decay  # 每层学习率递减
+                current_lr *= lr_decay  
 
-        # 设置优化器的参数组
+     
         self.optimizer.param_groups = layerwise_params
 
-        # 创建逐层调度器
+     
         self.schedulers = [
             torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=t_max, eta_min=group["lr"] * eta_min_factor)
             for group in self.optimizer.param_groups
         ]
 
     def step(self):
-        """更新所有层的学习率。"""
+     
         for scheduler in self.schedulers:
             scheduler.step()
 
     def get_layer_lrs(self):
-        """获取每层的当前学习率。"""
+
         return [group["lr"] for group in self.optimizer.param_groups]
 
 
@@ -210,17 +182,12 @@ class AddGaussianNoise:
 
     def __init__(self, mean=0.0, std=1.0):
         """
-        初始化高斯噪声参数
-        - mean: 噪声的均值
-        - std: 噪声的标准差
         """
         self.mean = mean
         self.std = std
 
     def __call__(self, tensor):
         """
-        在输入张量上添加高斯噪声
-        - tensor: 输入的图像张量，形状为 (C, H, W)
         """
         if len(tensor.size()) == 4:
             noise = torch.randn(tensor.size(0), 1, tensor.size(2), tensor.size(3)) * self.std + self.mean
@@ -239,9 +206,6 @@ class AddGaussianNoise:
 class AugmentedDataset(Dataset):
     def __init__(self, data, transform=None):
         """
-        参数:
-        - data: 输入数据，形状为 (N, C, H, W)
-        - transform: 数据增强的变换函数
         """
         self.data = data
         self.transform = transform
@@ -250,9 +214,9 @@ class AugmentedDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        original_sample, label = self.data[idx]  # 解包元组
+        original_sample, label = self.data[idx]  
 
-        # 对样本应用数据增强
+    
         if self.transform:
             augmented_sample = self.transform(original_sample)
         else:
@@ -326,10 +290,9 @@ class EncodableRandomCrop(torch.nn.Module):
         # mask.fill_(0)
         new_matrix = torch.zeros_like(mask)
 
-        # 将原矩阵的矩形区域值复制到新矩阵
         new_matrix[i:i + h, j:j + w] = mask[i:i + h, j:j + w]
 
-        # 替换原矩阵
+     
         mask = new_matrix
         # mask[i:i + h, j:j + w] = 1
 
@@ -446,7 +409,7 @@ class CustomCmpBatchDataset(Dataset):
         end_time = time.time()
 
         dcmp_time=end_time - start_time
-        unpack_image = torch.tensor(decompressed_batch)#.squeeze(0)  # 转换为 PyTorch 张量
+        unpack_image = torch.tensor(decompressed_batch)#.squeeze(0)  
         if self.aug_index is not None and len(self.aug_index) > 0:
             ori_tensor = unpack_image[:,:self.tensor_channel,:,:]
             aug_tensor = unpack_image[:,self.tensor_channel:,:,:]
@@ -474,14 +437,7 @@ class CustomCmpBatchDataset(Dataset):
 class CustomTrainer:
 
     def __init__(self, model, optimizer,logger=None, scheduler=None, criterion=None, device="cuda"):
-        """
-        初始化训练所需的对象
-        :param model: 要训练的模型
-        :param optimizer: 优化器
-        :param scheduler: 学习率调度器（可选）
-        :param criterion: 损失函数（可选）
-        :param device: 设备 (cpu 或 cuda)
-        """
+       
         self.model = model.to(device)
         self.optimizer = optimizer
         self.scheduler = scheduler
@@ -501,7 +457,6 @@ class CustomTrainer:
 
     def to(self, device):
         """
-        将模型和相关设备迁移到指定设备
         """
         self.device = device
         self.model = self.model.to(device)
@@ -525,7 +480,7 @@ class CustomTrainer:
         #----------------------------
         # if augmentation mask exists
         #----------------------------
-        height = input_data.size(2)  # 或 x.shape[2]
+        height = input_data.size(2)  # x.shape[2]
         width = input_data.size(3)
         if trans_mask is not None and trans_mask.numel() > 0:
             trans_mask = trans_mask.unsqueeze(1).to(device)
@@ -582,7 +537,7 @@ class CustomTrainer:
         #----------------------------
         # if augmentation mask exists
         #----------------------------
-        height = input_data.size(2)  # 或 x.shape[2]
+        height = input_data.size(2)  
         width = input_data.size(3)
         if trans_mask is not None and trans_mask.numel() > 0:
             trans_mask = trans_mask.unsqueeze(1).to(device)
@@ -604,9 +559,9 @@ class CustomTrainer:
         #----------------------------
         # calculate PSNR and SSIM
         #----------------------------
-        mse = F.mse_loss(pred, label_data, reduction='mean')  # 计算 MSE
+        mse = F.mse_loss(pred, label_data, reduction='mean')  #  MSE
         max_val = max(torch.max(label_data),torch.max(pred))
-        # psnr = 10 * torch.log10(max_val**2 / torch.sqrt(mse))   # 计算 PSNR
+        # psnr = 10 * torch.log10(max_val**2 / torch.sqrt(mse))   # PSNR
         # psnr = self.calculate_batch_psnr(pred, label_data)
         psnr_val = psnr(pred, label_data, data_range=max_val)
         self.psnr += psnr_val.detach().cpu().numpy()
@@ -654,16 +609,7 @@ class CustomTrainer:
         torch.save(state, filename)
     
     def calculate_batch_psnr(self, pred, label_data):
-        '''
-        批量计算 PSNR
-        Args:
-            pred (Tensor): 生成的张量 (B, C, H, W)
-            label_data (Tensor): 参考张量 (B, C, H, W)
-            max_val (float): 数据的最大可能值，默认 1.0（标准化到 [0, 1]）
-
-        Returns:
-            float: 平均 PSNR 值
-        '''
+        
         batch_size = pred.shape[0]
         psnr_values = []
 
@@ -681,43 +627,30 @@ class CustomTrainer:
     def test_normality(self, tensor, method='shapiro'):
         """
         Identify if the value in Tensor is normal distribution
-        Args:
-            tensor (torch.Tensor): 输入 Tensor
-            method (str): 正态性检验方法，可选 'shapiro', 'kstest', 'normaltest'
-        Returns:
-            bool: 是否符合正态分布
-            dict: 检验统计量和 p 值
+
         """
-        # 将 Tensor 转换为 NumPy 数组
+
         data = tensor.cpu().numpy().flatten()
         
-        # 选择正态性检验方法
+
         if method == 'shapiro':
             stat, p_value = shapiro(data)
-        elif method == 'kstest':
-            # 使用 Kolmogorov-Smirnov 检验
+        elif method == 'kstest'
             stat, p_value = kstest(data, 'norm', args=(data.mean(), data.std()))
         elif method == 'normaltest':
-            # 使用 D'Agostino 和 Pearson 的正态性检验
             stat, p_value = normaltest(data)
         else:
             raise ValueError("Invalid method. Choose from 'shapiro', 'kstest', or 'normaltest'")
-        
-        # 判断是否符合正态分布（显著性水平 0.05）
+    
         is_normal = p_value > 0.05
         self.visualize_distribution(tensor)
         
         return is_normal, {"statistic": stat, "p_value": p_value}
     
     def visualize_distribution(self,tensor):
-        """
-        可视化 Tensor 数据分布和 QQ 图
-        Args:
-            tensor (torch.Tensor): 输入 Tensor
-        """
+       
         data = tensor.cpu().numpy().flatten()
         
-        # 绘制直方图
         plt.figure(figsize=(6, 6))
         plt.hist(data, bins=200, density=True, alpha=0.6, color='g')
         plt.title("Histogram")
@@ -730,30 +663,13 @@ class CustomTrainer:
     
     def calculate_batch_minmax(self, batch_data):
         """
-        计算每个样本的 min 和 max 值
-        Args:
-            batch_data (torch.Tensor): 输入 batch 数据，形状为 (B, C, H, W)。
-        Returns:
-            torch.Tensor: 每个样本的最小值，形状为 (B,)。
-            torch.Tensor: 每个样本的最大值，形状为 (B,)。
+    
         """
-        # 沿 (C, H, W) 维度计算最小值和最大值
-        batch_min = torch.amin(batch_data, dim=(0, 2, 3))  # 结果形状为 (B,)
-        batch_max = torch.amax(batch_data, dim=(0, 2, 3))  # 结果形状为 (B,)
+        batch_min = torch.amin(batch_data, dim=(0, 2, 3))  
+        batch_max = torch.amax(batch_data, dim=(0, 2, 3))  
         return batch_min, batch_max
 
     def min_max_normalize(self,data, min_val=None, max_val=None, feature_range=(0, 1)):
-        """
-        对数据进行 Min-Max 归一化，同时支持指定 min/max。
-        Args:
-            data (torch.Tensor): 输入数据。
-            min_val (float, optional): 数据的最小值，若为 None 则从 data 中计算。
-            max_val (float, optional): 数据的最大值，若为 None 则从 data 中计算。
-            feature_range (tuple): 目标范围，默认为 (0, 1)。
-        Returns:
-            torch.Tensor: 归一化后的数据。
-            float: 使用的最小值。
-            float: 使用的最大值。
         """
         if min_val is None or max_val is None:
             min_val, max_val = data.min(), data.max()
@@ -764,14 +680,7 @@ class CustomTrainer:
 
     def min_max_denormalize(self, normalized_data, min_val, max_val, feature_range=(0, 1)):
         """
-        对 Min-Max 归一化后的数据进行反归一化。
-        Args:
-            normalized_data (torch.Tensor): 已归一化的数据。
-            min_val (float): 数据的最小值。
-            max_val (float): 数据的最大值。
-            feature_range (tuple): 归一化时的目标范围。
-        Returns:
-            torch.Tensor: 反归一化后的数据。
+       
         """
         if feature_range != (0, 1):
             normalized_data = (normalized_data - feature_range[0]) / (feature_range[1] - feature_range[0])
@@ -786,11 +695,7 @@ class CustomUNet(nn.Module):
                  features=(16, 32, 64, 128, 256),  # 默认 features
                  act="gelu"):
         """
-        自定义 UNet 初始化。
-        :param in_channels: 输入通道数（图像通道数）
-        :param out_channels: 输出通道数
-        :param features: UNet 中的编码器和解码器特征层配置
-        :param act: 激活函数
+       
         """
         super(CustomUNet, self).__init__()
         
@@ -799,20 +704,17 @@ class CustomUNet(nn.Module):
             spatial_dims=2,
             features=features,
             act=act,
-            in_channels=in_channels,  # 输入通道数加1以包含 mask
+            in_channels=in_channels,  
             out_channels=out_channels
         )
 
     def forward(self, x, mask = None):
         """
-        前向传播函数。
-        :param x: 输入图像 (batch, in_channels, height, width)
-        :param mask: 输入 mask (batch, 1, height, width)
-        :return: UNet 的输出
+      
         """
-        x = self.bn(x)                   # 先通过 BatchNorm2d
-        # x = torch.cat((x, mask), dim=1)  # 在通道维度上拼接 mask
-        x = self.unet(x)                 # 输入 UNet
+        x = self.bn(x)                   
+        # x = torch.cat((x, mask), dim=1)  
+        x = self.unet(x)                
         return x
 
 
@@ -822,11 +724,7 @@ class CustomMLP(nn.Module):
                  width,
                  height):
         """
-        Args
-            :param in_channels: 输入通道数（图像通道数）
-            :param out_channels: 输出通道数
-            :param features: UNet 中的编码器和解码器特征层配置
-            :param act: 激活函数
+        
         """
         super(CustomMLP, self).__init__()
         channels = in_channels * width * height
@@ -838,18 +736,15 @@ class CustomMLP(nn.Module):
 
     def forward(self, x):
         """
-        Args
-            :param x: 输入图像 (batch, in_channels, height, width)
-            :param mask: 输入 mask (batch, 1, height, width)
-            :return: UNet 的输出
+
         """
         tensor_size = x.size()
-        x = self.bn(x)# 先通过 BatchNorm2d
+        x = self.bn(x)
         x = x.reshape(tensor_size[0],-1)
         x = F.relu(self.linear1(x))
         x = F.relu(self.linear2(x))
-        # x = torch.cat((x, mask), dim=1)  # 在通道维度上拼接 mask
-        x = x.reshape(tensor_size)            # 输入 UNet
+        # x = torch.cat((x, mask), dim=1)  #
+        x = x.reshape(tensor_size)            # 
         return x
 
 
@@ -857,9 +752,6 @@ class CustomAutoencoder(nn.Module):
 
     def __init__(self, height, width, input_channels=3, latent_dim=128, downsampling_steps=2):
         """
-        :param input_channels: 输入图像的通道数 (e.g., RGB=3, grayscale=1)
-        :param latent_dim: 隐空间的维度大小
-        :param downsampling_steps: 下采样的次数
         """
         super(CustomAutoencoder, self).__init__()
         self.downsampling_steps = downsampling_steps
@@ -907,7 +799,7 @@ class ImageNetValDataset(Dataset):
         self.transform = transform
         self.samples = []
 
-        # 读取 val_annotations.txt 并解析标签
+       
         with open(annotations_file, 'r') as f:
             for line in f:
                 parts = line.strip().split('\t')
