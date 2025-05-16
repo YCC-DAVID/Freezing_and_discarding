@@ -29,13 +29,7 @@ def trans_mask():
 
 
 
-# print(model_names)
-# run = neptune.init_run(
-#     project="ycc-wandb/Resnet20-accuarcy",
-#     api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI1ODA0NTgzYS1iNDFhLTQwZDEtODAyOS1iYzU1OGQzMWEwODQifQ==",
-# )
-# params = {"learning_rate": 0.1, "optimizer": "SGD momentum_0.9"}
-# run["parameters"] = params
+
 
 parser = argparse.ArgumentParser(description='Propert ResNets for CIFAR10 in pytorch')
 # parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet32',
@@ -185,10 +179,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, wandb = None):
     data_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
-    # run = neptune.init_run(
-    # project="ycc-wandb/Resnet20-accuarcy",
-    # api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI1ODA0NTgzYS1iNDFhLTQwZDEtODAyOS1iYzU1OGQzMWEwODQifQ==",)
-
+    
     # switch to train mode
     model.train()
 
