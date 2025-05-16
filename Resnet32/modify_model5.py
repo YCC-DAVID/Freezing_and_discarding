@@ -38,7 +38,7 @@ torch.cuda.manual_seed(0)
 # subdir = f'Cmp4Train_exp/pytorch_resnet_cifar10/'
 np_dir='./npdata/'
 
-subdir = '/scratch/cy65664/workDir/comp_and_drop/'
+subdir = '/workDir/comp_and_drop/'
 img_dir = subdir+f'visualize_info/' 
 # save_dir = os.path.join(workdir, 'transfer_exp', 'checkpoint')
 
@@ -206,10 +206,10 @@ def main():
     normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
                                 std=[0.2470, 0.2435, 0.2616])
     ## Normal Data
-    cifar10_data = datasets.CIFAR10(root='/scratch/cy65664/workDir/comp_and_drop/data', train=True, download=True)
-    cifar100_data = datasets.CIFAR100(root='/scratch/cy65664/workDir/comp_and_drop/data', train=True, download=True)
+    cifar10_data = datasets.CIFAR10(root='workDir/comp_and_drop/data', train=True, download=True)
+    cifar100_data = datasets.CIFAR100(root='workDir/comp_and_drop/data', train=True, download=True)
     val_loader = DataLoader(
-        datasets.CIFAR100(root='/scratch/cy65664/workDir/comp_and_drop/data', train=False, transform=transforms.Compose([
+        datasets.CIFAR100(root='workDir/comp_and_drop/data', train=False, transform=transforms.Compose([
             transforms.ToTensor(),
             normalize,
         ]),download=True),
@@ -219,7 +219,7 @@ def main():
     
 
     train_loader = DataLoader(
-        datasets.CIFAR100(root='/scratch/cy65664/workDir/comp_and_drop/data', train=True, transform=transforms.Compose([
+        datasets.CIFAR100(root='workDir/comp_and_drop/data', train=True, transform=transforms.Compose([
             transforms.RandomHorizontalFlip(),
             transforms.RandomCrop(32, 4),
             transforms.ToTensor(),
@@ -335,7 +335,7 @@ def main():
                     # augmented_dataset = AugmentedDataset(cifar10_data, transform=data_aug)
                     # train_loader = DataLoader(augmented_dataset, batch_size=32, shuffle=True)
                     post_transforms = transforms.Compose([normalize]) # ,transforms.ToTensor()
-                    cifar100_data = datasets.CIFAR100(root='/scratch/cy65664/workDir/comp_and_drop/data', train=True, download=True) # ,transform=post_transforms
+                    cifar100_data = datasets.CIFAR100(root='workDir/comp_and_drop/data', train=True, download=True) # ,transform=post_transforms
                     augmented_dataset = CustomAugmentedDataset(data=cifar100_data,
                                                                 flip_prob=1,
                                                                 transform=post_transforms
