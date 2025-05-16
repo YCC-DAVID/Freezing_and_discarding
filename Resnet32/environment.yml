@@ -136,4 +136,3 @@ dependencies:
       - wrapt==1.16.0
       - zfpy==1.0.0
       - zipp==3.20.2
-prefix: /home/chence/anaconda3/envs/CMP4AI
