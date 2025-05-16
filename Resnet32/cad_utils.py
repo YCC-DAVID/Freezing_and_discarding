@@ -466,8 +466,8 @@ def zfpy_compress_output(tol):
 
 class AvgPoolAndFlatten(nn.Module):
     def forward(self, x):
-        x = F.avg_pool2d(x, x.size()[3])  # 全局池化
-        x = x.view(x.size(0), -1)         # 展平
+        x = F.avg_pool2d(x, x.size()[3])  
+        x = x.view(x.size(0), -1)        
         return x
 
 
@@ -481,9 +481,9 @@ def seperate_model(model,pos):
                 flattened.append(module)
         return flattened
     def insert_relu_after_second_layer(sequential_model):
-        layers = list(sequential_model.children())  # 将原始模型的层转为列表
+        layers = list(sequential_model.children()) 
         if len(layers) >= 2:
-            layers.insert(2, nn.ReLU())  # 在第二层之后插入 ReLU
+            layers.insert(2, nn.ReLU())  
         return nn.Sequential(*layers)
      # 初始化键名映射
     mapping = {}
@@ -508,29 +508,28 @@ def seperate_model(model,pos):
                 + flatten_sequential(list(model.children())[2 + layer_num + 1:])))
         assert len(front_layers)+len(remaining_layers)==18, "seprarate model lack some part"
 
-    front_layers = insert_relu_after_second_layer(front_layers)  # 在前半部分插入 ReLU
+    front_layers = insert_relu_after_second_layer(front_layers)  
 
-    # 添加键名映射
+
     original_state_dict = model.state_dict()
     front_state_dict = front_layers.state_dict()
     
 
-    mapping_front = {}  # 拆分后键名 → 带前缀键名
-    mapping_remain = {}  # 带前缀键名 → 原始模型键名
-    mapping_final = {}  # 最终映射：拆分后键名 → 原始模型键名
+    mapping_front = {}  
+    mapping_remain = {}  
+    mapping_final = {}  
     used_original_keys = set()
 
-    # 为前半部分添加映射
     for key in front_state_dict.keys():
-        prefixed_key = f"f.{key}"  # 带前缀的键名
+        prefixed_key = f"f.{key}"  
         mapping_front[key] = prefixed_key
         for original_key in original_state_dict.keys():
-            # 确保匹配 shape 且原始键未被使用
+          
             if ( front_state_dict[key].shape == original_state_dict[original_key].shape
                 and original_key not in used_original_keys
             ):
                 mapping_final[prefixed_key] = original_key
-                used_original_keys.add(original_key)  # 标记为已使用
+                used_original_keys.add(original_key)  
                 break
 
     
@@ -538,27 +537,26 @@ def seperate_model(model,pos):
     # add the average pooling and flatten layer
     if len(remaining_layers) > 1:
         new_remaining_layers = nn.Sequential(
-            *list(remaining_layers.children())[:-1],  # 剔除最后一层
-            AvgPoolAndFlatten(),                      # 添加自定义模块
-            list(remaining_layers.children())[-1]     # 添加最后一层
+            *list(remaining_layers.children())[:-1], 
+            AvgPoolAndFlatten(),                      
+            list(remaining_layers.children())[-1]     
         )
     else:
         new_remaining_layers = nn.Sequential(
             AvgPoolAndFlatten(),
             *list(remaining_layers.children())
         )
-        # 为后半部分添加映射
 
     remain_state_dict = new_remaining_layers.state_dict()
     for key in remain_state_dict.keys():
-        prefixed_key = f"r.{key}"  # 带前缀的键名
+        prefixed_key = f"r.{key}"  
         mapping_remain[key] = prefixed_key
         for original_key in original_state_dict.keys():
             if ( remain_state_dict[key].shape == original_state_dict[original_key].shape
                 and original_key not in used_original_keys
             ):
                 mapping_final[prefixed_key] = original_key
-                used_original_keys.add(original_key)  # 标记为已使用
+                used_original_keys.add(original_key)  
                 break
 
     mapping_list=[mapping_front,mapping_remain,mapping_final]
@@ -571,28 +569,27 @@ def merge_models(front_model, remain_model, new_model, mappinglist):
     
     new_state_dict = new_model.state_dict()
     
-    # 合并前半部分
+ 
     front_state_dict = front_model.state_dict()
     for split_key, prefixed_key in front_mapping.items():
-        # 通过 final_mapping 找到原始模型键名
+     
         if prefixed_key in final_mapping:
             original_key = final_mapping[prefixed_key]
             if original_key in new_state_dict:
-                # 将前半部分模型的参数赋值到新模型
+                
                 new_state_dict[original_key] = front_state_dict[split_key]
 
-    # 加载后半部分参数
     remain_state_dict = remain_model.state_dict()
     for split_key, prefixed_key in remain_mapping.items():
-        # 通过 final_mapping 找到原始模型键名
+   
         if prefixed_key in final_mapping:
             original_key = final_mapping[prefixed_key]
             if original_key in new_state_dict:
-                # 将后半部分模型的参数赋值到新模型
+        
                 new_state_dict[original_key] = remain_state_dict[split_key]
 
 
-    # 加载合并后的参数
+
     new_model.load_state_dict(new_state_dict, strict=True)
  
     return new_model
@@ -606,18 +603,18 @@ def shuffle_data(data,):
 
 def calculate_model_memory(model, input_size, device='cuda'):
     model = model.to(device)
-    dtype_size = torch.tensor([], dtype=torch.float32).element_size()  # 单个float32占用的字节数
+    dtype_size = torch.tensor([], dtype=torch.float32).element_size()  
     
-    # 计算权重和权重梯度的内存占用
+   
     weight_memory = sum(p.numel() for p in model.parameters()) * dtype_size
     grad_memory = sum(p.numel() for p in model.parameters() if p.requires_grad) * dtype_size
     
-    # Hook 用于记录激活值和激活值梯度
-    activation_memory = [0]  # 使用列表方便闭包修改
+   
+    activation_memory = [0]  
     gradient_memory = [0]
 
     def forward_hook(module, input, output):
-        if isinstance(output, tuple):  # 兼容多输出的情况
+        if isinstance(output, tuple):  
             for o in output:
                 activation_memory[0] += o.numel() * dtype_size
         else:
@@ -631,20 +628,20 @@ def calculate_model_memory(model, input_size, device='cuda'):
         else:
             gradient_memory[0] += grad_output.numel() * dtype_size
     
-    # 注册 Hook
+
     hooks = []
     for module in model.modules():
         if len(list(module.children())) == 0:
             hooks.append(module.register_forward_hook(forward_hook))
             hooks.append(module.register_backward_hook(backward_hook))
     
-    # 模拟一次前向和后向传播
+
     dummy_input = torch.randn(*input_size, device=device)
     output = model(dummy_input)
     loss = output.sum()
     loss.backward()
     
-    # 移除 Hook
+  
     for hook in hooks:
         hook.remove()
     
